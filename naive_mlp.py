@@ -82,14 +82,19 @@ class Network:
         for to_neuron_idx in range(to_layer.num_neurons):
             to_neuron = to_layer.neurons[to_neuron_idx]
             to_neuron_input = 0
-            logging.debug("\tTo Neuron: %d", to_neuron_idx)
+            logging.debug("\tTo-Neuron Idx: %d", to_neuron_idx)
             for from_neuron_idx in range(from_layer.num_neurons):
-                logging.debug("\t\tFrom Neuron: %d", from_neuron_idx)
                 from_neuron = from_layer.neurons[from_neuron_idx]
                 weight = self.get_weight(from_neuron_idx, to_neuron_idx, from_layer)
                 to_neuron_input += weight * from_neuron.activation
+                logging.debug("\t\tFrom-Neuron Idx: %d", from_neuron_idx)
+                logging.debug("\t\t\tFrom-Neuron Weight: %f", weight)
+                logging.debug("\t\t\tFrom-Neuron Activation: %f", from_neuron.activation)
             to_neuron.input_value = to_neuron_input
             to_neuron.set_activation()
+            logging.debug("\t\tTo-Neuron Input: %f", to_neuron.input_value)
+            logging.debug("\t\tTo-Neuron Bias: %f", to_neuron.bias)
+            logging.debug("\t\tTo-Neuron Activation: %f", to_neuron.activation)
     def forward_pass(self):
         for from_layer in self.layers[:-1]:
             self.layer_forward_pass(from_layer)
