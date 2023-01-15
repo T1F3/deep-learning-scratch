@@ -1,4 +1,7 @@
 import random
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 def relu_activation(x):
     """Only return either positive inputs or 0"""
@@ -75,10 +78,13 @@ class Network:
         return layer_weights.get_weight(from_neuron_idx, to_neuron_idx)
     def layer_forward_pass(self, from_layer: Layer):
         to_layer: Layer = self.layers[from_layer.layer_idx + 1]
+        logging.debug("To Layer: %d", to_layer.layer_idx)
         for to_neuron_idx in range(to_layer.num_neurons):
             to_neuron = to_layer.neurons[to_neuron_idx]
             to_neuron_input = 0
+            logging.debug("\tTo Neuron: %d", to_neuron_idx)
             for from_neuron_idx in range(from_layer.num_neurons):
+                logging.debug("\t\tFrom Neuron: %d", from_neuron_idx)
                 from_neuron = from_layer.neurons[from_neuron_idx]
                 weight = self.get_weight(from_neuron_idx, to_neuron_idx, from_layer)
                 to_neuron_input += weight * from_neuron.activation
@@ -89,30 +95,3 @@ class Network:
             self.layer_forward_pass(from_layer)
         final_layer: Layer = self.layers[-1]
         return [neuron.activation for neuron in final_layer.neurons]
-
-
-
-inputs = [
-    [0, 0],
-    [0, 1],
-    [1, 0],
-    [1, 1],
-]
-outputs = [0, 1, 1, 0]
-
-xor_network = Network()
-input_layer = Layer(2, activations=inputs[0])
-output_layer = Layer(1)
-xor_network = (
-    xor_network
-    .add_layer(input_layer)
-    .add_layer(Layer(10))
-    .add_layer(Layer(10))
-    .add_layer(Layer(10))
-    .add_layer(Layer(10))
-    .add_layer(Layer(10))
-    .add_layer(output_layer)
-)
-
-print(xor_network.forward_pass())
-# print([weight.weights for weight in xor_network.layer_weights])
