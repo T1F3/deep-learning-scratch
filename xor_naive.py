@@ -12,13 +12,12 @@ inputs = [
 outputs = [0, 1, 1, 0]
 
 xor_network = Network()
-input_layer = Layer(2, activations=inputs[3])
-output_layer = Layer(1)
+
 xor_network = (
     xor_network
-    .add_layer(input_layer)
     .add_layer(Layer(2))
-    .add_layer(output_layer)
+    .add_layer(Layer(2))
+    .add_layer(Layer(1))
 )
 
-xor_network.forward_pass()
+xor_network.forward_pass(inputs[:])
