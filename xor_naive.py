@@ -9,7 +9,7 @@ inputs = [
     [1, 0],
     [1, 1],
 ]
-outputs = [0, 1, 1, 0]
+targets = [[0], [1], [1], [0]]
 
 xor_network = Network()
 xor_network = (
@@ -18,4 +18,4 @@ xor_network = (
     .add_layer(Layer(2))
     .add_layer(Layer(1))
 )
-xor_network.forward_pass(inputs[:])
+xor_network.fit(inputs, targets)

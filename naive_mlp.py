@@ -12,7 +12,9 @@ def relu_activation(x):
     return max(0, x)
 
 def l2_loss(output, target):
-    error = ((output - target) ** 2) / 2
+    error = 0
+    for output_value, target_value in zip(output, target):
+        error += ((output_value - target_value) ** 2) / 2
     return error
 
 def relu_derivative(x):
@@ -27,6 +29,8 @@ class Bias:
     def __init__(self, value, error_gradient=None):
         self.value = value
         self.error_gradient = error_gradient
+
+# Primitive Classes
 
 class Neuron:
     def __init__(
@@ -49,6 +53,8 @@ class Neuron:
     def set_activation(self):
         if self.input_value is not None:
             self.activation =  self.activation_function(self.input_value + self.bias.value)
+    def set_neuron_bias_gradient(self):
+        self.bias.error_gradient = self.error
 
 class Layer:
     def __init__(
@@ -70,8 +76,6 @@ class Layer:
     def set_neuron_activations(self, activations: list):
         for neuron, activation in zip(self.neurons, activations):
             neuron.activation = activation
-    def get_neuron_activations(self):
-        return [neuron.activation for neuron in self.neurons]
 
 class Weight:
     def __init__(self, value, error_gradient=None):
@@ -90,6 +94,13 @@ class DenseLayerWeights:
     def get_weight(self, from_neuron_idx: int, to_neuron_idx: int):
         return self.weights[to_neuron_idx][from_neuron_idx]
 
+def update_item_value_w_gradient_descent_step(
+    item: Union[Bias, Weight],
+    learning_rate: float=0.001
+):
+    item.value -= (item.error_gradient * learning_rate)
+
+
 class Network:
     def __init__(self):
         self.layers = []
@@ -106,6 +117,39 @@ class Network:
     def _get_weight(self, from_neuron_idx: int, to_neuron_idx: int, from_layer: Layer):
         layer_weights: DenseLayerWeights = self.layer_weights[from_layer.layer_idx]
         return layer_weights.get_weight(from_neuron_idx, to_neuron_idx)
+    def get_output_neurons(self):
+        output_layer: Layer = self.layers[-1]
+        return output_layer.neurons
+    def set_output_neuron_error(self, target: list(float), loss_derivative_func=l2_loss_derivative):
+        output_neurons = self.get_output_neurons()
+        for output_neuron, target_value in zip(output_neurons, target):
+            d_activation_d_input = output_neuron.activation_derivative_func(output_neuron.input_value)
+            d_loss_d_activation = loss_derivative_func(output_neuron.activation, target_value)
+            neuron_error = d_loss_d_activation * d_activation_d_input
+            output_neuron.error = neuron_error
+            output_neuron.set_neuron_bias_gradient()
+            update_item_value_w_gradient_descent_step(output_neuron.bias)
+
+    def learn_step_for_layer_from_neurons(self, layer_weights: DenseLayerWeights):
+        for from_neuron in layer_weights.from_layer.neurons:
+            to_layer_weighted_errors = 0
+            for to_neuron in layer_weights.to_layer.neurons:
+                weight = layer_weights.get_weight(from_neuron.node_idx, to_neuron.node_idx).value
+                to_layer_weighted_errors += to_neuron.error * weight
+            neuron_error = (
+                to_layer_weighted_errors * from_neuron.activation_derivative_func(from_neuron.input_value)
+            )
+            from_neuron.error = neuron_error
+            from_neuron.set_neuron_bias_gradient()
+            update_item_value_w_gradient_descent_step(from_neuron.bias)
+
+    def learn_step_for_layer_weight_gradients(self, layer_weights: DenseLayerWeights):
+        for from_neuron in layer_weights.from_layer.neurons:
+            for to_neuron in layer_weights.to_layer.neurons:
+                d_error_d_weight = from_neuron.activation * to_neuron.error
+                weight = layer_weights.get_weight(from_neuron.node_idx, to_neuron.node_idx)
+                weight.error_gradient = d_error_d_weight
+                update_item_value_w_gradient_descent_step(weight)
     def _layer_forward_pass(self, from_layer: Layer):
         to_layer: Layer = self.layers[from_layer.layer_idx + 1]
         logging.debug("To Layer: %d", to_layer.layer_idx)
@@ -125,66 +169,30 @@ class Network:
             logging.debug("\t\tTo-Neuron Input: %f", to_neuron.input_value)
             logging.debug("\t\tTo-Neuron Bias: %f", to_neuron.bias.value)
             logging.debug("\t\tTo-Neuron Activation: %f", to_neuron.activation)
-    def _single_pass(self, network_input):
+    def _single_forward_pass(self, network_input):
         input_layer: Layer = self.layers[0]
         input_layer.set_neuron_activations(network_input)
         for from_layer in self.layers[:-1]:
             self._layer_forward_pass(from_layer)
+    def _single_backprop_pass(self, target):
+        self.set_output_neuron_error(target)
+        for layer_weight in self.layer_weights[::-1]:
+            self.learn_step_for_layer_from_neurons(layer_weight)
+            self.learn_step_for_layer_weight_gradients(layer_weight)
 
-    def forward_pass(self, network_inputs):
-        for idx, network_input in enumerate(network_inputs):
+    def _epoch_pass(self, network_inputs, targets):
+        for idx, network_input, target in enumerate(zip(network_inputs, targets)):
             # pylint: disable=logging-fstring-interpolation
+            # forward pass
             logging.debug(f"------Input idx: {idx}, Value: {network_input}------")
-            self._single_pass(network_input)
-            output_layer: Layer = self.layers[-1]
-            network_output = output_layer.get_neuron_activations()
+            self._single_forward_pass(network_input)
+            output_neurons = self.get_output_neurons()
+            network_output: list[float] = [neuron.activation for neuron in output_neurons]
+            output_loss = l2_loss(network_output, target)
             logging.debug(f"------Network Output: {network_output}------")
-
+            logging.debug(f"------Output Loss: {output_loss}------")
+            # backward pass
+            self._single_backprop_pass(target)
     def fit(self, inputs, targets, epochs=1):
         for _ in range(epochs):
-            self.forward_pass(inputs)
-            # self.backprop(targets)
-
-
-def set_output_layer_neuron_error(
-    output_neuron: Neuron,
-    target,
-    loss_derivative_func=l2_loss_derivative,
-):
-    d_activation_d_input = output_neuron.activation_derivative_func(output_neuron.input_value)
-    d_loss_d_activation = loss_derivative_func(output_neuron.activation, target)
-    neuron_error = d_loss_d_activation * d_activation_d_input
-    output_neuron.error = neuron_error
-
-def set_layer_neuron_error(
-    from_neuron: Neuron,
-    layer_weights: DenseLayerWeights,
-):
-    to_layer_weighted_errors = 0
-    for to_neuron in layer_weights.to_layer.neurons:
-        weight = layer_weights.get_weight(from_neuron.node_idx, to_neuron.node_idx).value
-        to_layer_weighted_errors += to_neuron.error * weight
-    neuron_error = (
-        to_layer_weighted_errors * from_neuron.activation_derivative_func(from_neuron.input_value)
-    )
-    from_neuron.error = neuron_error
-
-def set_neuron_bias_gradient(neuron: Neuron):
-    neuron.bias.error_gradient = neuron.error
-
-def set_layer_weight_gradients(
-    layer_weights: DenseLayerWeights,
-    from_neuron: Neuron,
-    to_neuron: Neuron,
-):
-    from_neuron_activation = from_neuron.activation
-    to_neuron_error = to_neuron.error
-    d_error_d_weight = from_neuron_activation * to_neuron_error
-    weight = layer_weights.get_weight(from_neuron.node_idx, to_neuron.node_idx)
-    weight.error_gradient = d_error_d_weight
-
-def update_item_value_w_gradient_descent_step(
-    item: Union[Bias, Weight],
-    learning_rate: float=0.001
-):
-    item.value -= (item.error_gradient * learning_rate)
+            self._epoch_pass(inputs, targets)
