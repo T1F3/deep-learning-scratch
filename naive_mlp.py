@@ -5,7 +5,7 @@ import logging
 from typing import Union
 
 logging.basicConfig(level=logging.DEBUG)
-
+# pylint: disable=logging-fstring-interpolation
 
 def relu_activation(x):
     """Only return either positive inputs or 0"""
@@ -120,7 +120,7 @@ class Network:
     def get_output_neurons(self):
         output_layer: Layer = self.layers[-1]
         return output_layer.neurons
-    def set_output_neuron_error(self, target: list(float), loss_derivative_func=l2_loss_derivative):
+    def set_output_neuron_error(self, target: list[float], loss_derivative_func=l2_loss_derivative):
         output_neurons = self.get_output_neurons()
         for output_neuron, target_value in zip(output_neurons, target):
             d_activation_d_input = output_neuron.activation_derivative_func(output_neuron.input_value)
@@ -131,11 +131,15 @@ class Network:
             update_item_value_w_gradient_descent_step(output_neuron.bias)
 
     def learn_step_for_layer_from_neurons(self, layer_weights: DenseLayerWeights):
+        logging.debug(f"Layer: from: {layer_weights.from_layer.layer_idx} to {layer_weights.to_layer.layer_idx}")
+        if layer_weights.from_layer.layer_idx == 0:
+            return
         for from_neuron in layer_weights.from_layer.neurons:
             to_layer_weighted_errors = 0
             for to_neuron in layer_weights.to_layer.neurons:
                 weight = layer_weights.get_weight(from_neuron.node_idx, to_neuron.node_idx).value
                 to_layer_weighted_errors += to_neuron.error * weight
+            logging.debug(f"from neuron idx: {from_neuron.node_idx}")
             neuron_error = (
                 to_layer_weighted_errors * from_neuron.activation_derivative_func(from_neuron.input_value)
             )
@@ -152,47 +156,56 @@ class Network:
                 update_item_value_w_gradient_descent_step(weight)
     def _layer_forward_pass(self, from_layer: Layer):
         to_layer: Layer = self.layers[from_layer.layer_idx + 1]
-        logging.debug("To Layer: %d", to_layer.layer_idx)
+        logging.debug("\tTo Layer: %d", to_layer.layer_idx)
         for to_neuron_idx in range(to_layer.num_neurons):
             to_neuron = to_layer.neurons[to_neuron_idx]
             to_neuron_input = 0
-            logging.debug("\tTo-Neuron Idx: %d", to_neuron_idx)
+            logging.debug("\t\tTo-Neuron Idx: %d", to_neuron_idx)
             for from_neuron_idx in range(from_layer.num_neurons):
                 weight = self._get_weight(from_neuron_idx, to_neuron_idx, from_layer).value
                 from_neuron = from_layer.neurons[from_neuron_idx]
-                logging.debug("\t\tFrom-Neuron Idx: %d", from_neuron_idx)
-                logging.debug("\t\t\tFrom-Neuron Weight: %f", weight)
-                logging.debug("\t\t\tFrom-Neuron Activation: %f", from_neuron.activation)
+                logging.debug("\t\t\tFrom-Neuron Idx: %d", from_neuron_idx)
+                logging.debug("\t\t\t\tFrom-Neuron Weight: %f", weight)
+                logging.debug("\t\t\t\tFrom-Neuron Activation: %f", from_neuron.activation)
                 to_neuron_input += weight * from_neuron.activation
             to_neuron.input_value = to_neuron_input
             to_neuron.set_activation()
-            logging.debug("\t\tTo-Neuron Input: %f", to_neuron.input_value)
-            logging.debug("\t\tTo-Neuron Bias: %f", to_neuron.bias.value)
-            logging.debug("\t\tTo-Neuron Activation: %f", to_neuron.activation)
+            logging.debug("\t\t\tTo-Neuron Input: %f", to_neuron.input_value)
+            logging.debug("\t\t\tTo-Neuron Bias: %f", to_neuron.bias.value)
+            logging.debug("\t\t\tTo-Neuron Activation: %f", to_neuron.activation)
     def _single_forward_pass(self, network_input):
         input_layer: Layer = self.layers[0]
         input_layer.set_neuron_activations(network_input)
         for from_layer in self.layers[:-1]:
             self._layer_forward_pass(from_layer)
     def _single_backprop_pass(self, target):
+        logging.debug("\t------Starting BackProp------")
         self.set_output_neuron_error(target)
         for layer_weight in self.layer_weights[::-1]:
             self.learn_step_for_layer_from_neurons(layer_weight)
             self.learn_step_for_layer_weight_gradients(layer_weight)
 
     def _epoch_pass(self, network_inputs, targets):
-        for idx, network_input, target in enumerate(zip(network_inputs, targets)):
-            # pylint: disable=logging-fstring-interpolation
+        epoch_loss = 0
+        for idx, input_target_pair in enumerate(zip(network_inputs, targets)):
+            network_input, target = input_target_pair
             # forward pass
-            logging.debug(f"------Input idx: {idx}, Value: {network_input}------")
+            logging.debug(f"\t------Input idx: {idx}, Input: {network_input}, Target: {target}------")
             self._single_forward_pass(network_input)
             output_neurons = self.get_output_neurons()
             network_output: list[float] = [neuron.activation for neuron in output_neurons]
-            output_loss = l2_loss(network_output, target)
-            logging.debug(f"------Network Output: {network_output}------")
-            logging.debug(f"------Output Loss: {output_loss}------")
+            logging.debug(f"\t------Network Output: {network_output}------")
+            epoch_loss += l2_loss(network_output, target)
             # backward pass
             self._single_backprop_pass(target)
-    def fit(self, inputs, targets, epochs=1):
-        for _ in range(epochs):
-            self._epoch_pass(inputs, targets)
+        network_loss = epoch_loss / len(targets)
+        logging.debug(f"------Avg Epoch Loss: {network_loss}------")
+        return network_loss
+    def fit(self, inputs, targets, epochs=400):
+        logging.debug(f"{[layer.layer_idx for layer in self.layers]}")
+        epoch_losses = []
+        for epoch in range(epochs):
+            logging.debug(f"------Epoch #{epoch}------")
+            epoch_network_loss = self._epoch_pass(inputs, targets)
+            epoch_losses.append(epoch_network_loss)
+        logging.warn(f"------Epoch Losses: {epoch_losses}------")

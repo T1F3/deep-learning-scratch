@@ -18,4 +18,4 @@ xor_network = (
     .add_layer(Layer(2))
     .add_layer(Layer(1))
 )
-xor_network.fit(inputs, targets)
+xor_network.fit(inputs[:], targets[:])
