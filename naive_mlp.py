@@ -86,7 +86,7 @@ class DenseLayerWeights:
     """Created nested weight array for pair of layers"""
     def __init__(self, from_layer: Layer, to_layer: Layer):
         self.weights = [
-            [Weight(random.uniform(-0.5, 0.5)) for _ in range(from_layer.num_neurons)]
+            [Weight(random.uniform(-1, 1)) for _ in range(from_layer.num_neurons)]
             for _ in range(to_layer.num_neurons)
         ]
         self.from_layer = from_layer
