@@ -38,7 +38,7 @@ class Neuron:
         activation_function,
         activation_derivative_func,
         node_idx=None,
-        bias_value=random.uniform(-2, 2),
+        bias_value=random.uniform(0, 0),
         activation = None,
     ):
         self.bias = Bias(bias_value)
@@ -86,7 +86,7 @@ class DenseLayerWeights:
     """Created nested weight array for pair of layers"""
     def __init__(self, from_layer: Layer, to_layer: Layer):
         self.weights = [
-            [Weight(random.uniform(-2, 2)) for _ in range(from_layer.num_neurons)]
+            [Weight(random.uniform(-0.5, 0.5)) for _ in range(from_layer.num_neurons)]
             for _ in range(to_layer.num_neurons)
         ]
         self.from_layer = from_layer
@@ -96,7 +96,7 @@ class DenseLayerWeights:
 
 def update_item_value_w_gradient_descent_step(
     item: Union[Bias, Weight],
-    learning_rate: float=0.001
+    learning_rate: float=1
 ):
     item.value -= (item.error_gradient * learning_rate)
 
@@ -201,7 +201,7 @@ class Network:
         network_loss = epoch_loss / len(targets)
         logging.debug(f"------Avg Epoch Loss: {network_loss}------")
         return network_loss
-    def fit(self, inputs, targets, epochs=400):
+    def fit(self, inputs, targets, epochs=3):
         logging.debug(f"{[layer.layer_idx for layer in self.layers]}")
         epoch_losses = []
         for epoch in range(epochs):
