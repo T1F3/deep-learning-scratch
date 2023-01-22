@@ -208,4 +208,4 @@ class Network:
             logging.debug(f"------Epoch #{epoch}------")
             epoch_network_loss = self._epoch_pass(inputs, targets)
             epoch_losses.append(epoch_network_loss)
-        logging.warn(f"------Epoch Losses: {epoch_losses}------")
+        logging.debug(f"------Epoch Losses: {epoch_losses}------")
